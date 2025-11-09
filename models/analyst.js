@@ -3,9 +3,10 @@ var Schema = mongoose.Schema;
 var bcrypt = require('bcrypt');
 
 
-var userSchema = new Schema({
-    name: String,
-    contact: String,
+var analystSchema = new Schema({
+    username: String,
+    email: String,
+    password: String,
     authDate: Date,
     otp: String,
     registered: Boolean,
@@ -14,5 +15,5 @@ var userSchema = new Schema({
 });
 
 
-const User = mongoose.model('User', userSchema);
-module.exports = User;
+const Analyst = mongoose.model('Analyst', analystSchema);
+module.exports = Analyst;

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user');
+const Form = require('../models/form');
 const twilio = require('twilio');
 const bcrypt = require('bcrypt');
 const joi = require('joi');
@@ -22,22 +23,22 @@ router.route('/auth')
 .post(async(req, res) => {
     try{
         var body = req.body;
-        console.log("req body -- ", body);
+        
         var contact = body.contact;
-
-        if(contact.length !== 10){
+        if(contact === undefined){
+            contact = body.email;
+        }
+        if(contact===undefined){
             res.json({sucess: false, msg: 'Incorrect contact!'});
             return;    
         }
         contact = ("+91"+contact);
-        console.log("contact -- ", contact);
-        console.log("validated");
-
+        console.log("contact -", contact);
         var body = req.body;
 
         User.findOne({'contact': body.contact}, async(err, usr) => {
             if(err) throw err;
-            console.log("user -- ", usr);
+            
             var flag = 0;
             if(usr){
                 flag = 1;
@@ -50,7 +51,7 @@ router.route('/auth')
             body.otp = otp_number;
 
             var date = new Date();
-            console.log("date -- ", date);
+            
             body.authDate = date;
             body.name = "";
             body.currAdd = "";
@@ -78,30 +79,32 @@ router.route('/auth')
                 decoded = await jwt.decode(token, process.env.secret);
                 
             } catch (err){
-                res.send({success: false, msg: 'Some server error occurred! Please retry', token: token});
+                res.status(500).json({success: false, msg: 'Some server error occurred! Please retry', token: token});
                 throw err;
 
             }
             
             if(decoded){
-                // try{
-                //     await client.messages.create({
-                //         to: contact,
-                //         body: txt,
-                //         from: process.env.twilio_from
-                //     }).then(async(message) => {
-                //         if(message.errorMessage){
-                //             res.send({success: false, msg: 'Failed sending otp, check the number you entered!'});    
-                //             return;
-                //         }
+                try{
+                    // await client.messages.create({
+                    //     to: contact,
+                    //     body: txt,
+                    //     from: process.env.twilio_from
+                    // }).then(async(message) => {
+                    //     if(message.errorMessage){
+                    //         res.send({success: false, msg: 'Failed sending otp, check the number you entered!'});    
+                    //         return;
+                    //     }
 
-                        res.send({success: true, msg: 'Otp sent successfully!', token: token});
-                //     }).done();
-                // } catch (err){
-                    // res.send({success: false, msg: 'Failed sending otp, check the number you entered!'});    
-                // }
+                    //     res.send({success: true, msg: 'Otp sent successfully!', token: token});
+                    // }).done();
+                    console.log(`OTP for user: ${user.contact} is: ${otp_number}`);
+                    res.status(200).json({success: true, msg: 'Otp sent successfully!', token: token});
+                } catch (err){
+                    res.status(400).json({success: false, msg: 'Failed sending otp, check the number you entered!'});    
+                }
             } else {
-                res.send({success: false, msg: 'Server error, Please retry'});    
+                res.status(500).json({success: false, msg: 'Server error, Please retry'});    
             }
             
             
@@ -152,8 +155,6 @@ router.route('/register')
     }
 })
 
-
-
 router.route('/otpverify')
 .post(async(req, res) => {
     try{
@@ -198,10 +199,13 @@ router.route('/otpverify')
 router.route('/getForms')
 .post(async(req, res) => {
     try{
-        var body = req.body;
-        console.log("body -- ", body);
-    } catch (err){
-        console.log("error in get forms -- ", err);
+        console.log("get forms -- ");
+        var forms = await Form.find({});
+        console.log("forms - ", forms);
+        return res.send({success: true, forms: forms});
+    } catch(err){
+        console.log("error in getForms -- ", err);
+        return res.send({success: false});
     }
 });
 

@@ -1,84 +1,66 @@
 const express = require('express');
 const morgan  = require('morgan');
-const dotenv = require('dotenv');
-dotenv.config()
 const connectDB = require('./config/db');
-const passport = require('passport');
 const bodyParser = require('body-parser');
-const path = require('path');
+const cookieParser = require('cookie-parser');
+const dotenv = require('dotenv');
+var engine = require('consolidate');
 var Person = require('./models/person');
-const PORT = process.env.PORT || 4000;
-// const hostname = process.env.hostname || '127.0.0.1';
+const WebSocket = require('ws');
 
+
+const PORT = process.env.PORT || 4000;
+dotenv.config()
 connectDB();
+
 
 const app = express();
 
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
-
-app.use('/', require('./routes/index'));
-app.use('/api', require('./routes/api'));
-
-var engine = require('consolidate');
-
+app.use(cookieParser());
+app.use(morgan('dev'));
 app.set('views', __dirname + '/views');
 app.engine('html', engine.mustache);
 app.set('view engine', 'html');
 
 
-app.use(morgan('dev'));
+
+app.use('/', require('./routes/index'));
+app.use('/api', require('./routes/api'));
+app.use('/analyst/api', require('./routes/analystApi'));
+
 
 
 var server = require('http').createServer(app);
 
-const WebSocket = require('ws');
-
 var wss = new WebSocket.Server({port: 4001});
 
+var getId = (person) => {
+  var keys = ["adhar", "Adhar", "aadhar", "Aadhar", "adhaar", "Adhaar", "aadhaar", "Aadhaar"];
+  for(let i = 0; i < keys.length; i++){
+    var key = keys[i];
+    if(person[key] !== undefined && person[key] !== null) return person[key];
+  }
+
+}
+
 wss.on('connection', (ws, req) => {
-
   try{
-  
     const clientIP = req.connection.remoteAddress;
-    console.log("Someone Connected -- ", clientIP); 
-    
+    // console.log("Connection attempt -- ", clientIP); 
     ws.send("sid-1111", () => {
-      console.log("Sending data");
+      // console.log("Established");
     });
-    
     ws.on('message', async(msg) => {
-      
-      var data = msg.toString().split('"');
-      
-      data = data[15];
-      
-      // var dv = data["DataValue"].toString();
-      var ddv = JSON.parse((JSON.stringify(Buffer.from(data, 'base64').toString())));
-      
-
-      var jd = {};
-
-      var ar = ddv.split(",");
-
-      for(let i=0;i<ar.length;i++){
-        var x = ar[i];
-        var kv = x.split(":");
-        var kp = kv[0].split('"');
-        console.log(kp);
-        var k = kp[1];
-        var vp = kv[1].split('"');
-        console.log(vp);
-        var v = vp[1];
-        jd[k] = v;
-      }
-
-      console.log("Data -- ", jd);
-
-      // await Person(jd).save();
-      
-      
-      
+      var pmsg = await JSON.parse(msg);
+      var ddv = await JSON.parse((Buffer.from(pmsg["DataValue"], 'base64').toString()));
+      ddv["surveyType"] = ddv["fields"]["surveyType"];
+      ddv["formName"] = ddv["fields"]["formName"];
+      var id = getId(ddv["fields"]);
+      var newperson = new Person(ddv);
+      await newperson.save();
+      console.log("[.] new person id - ", id);
     });
   } catch (err) {
     console.log("socket error -- ", err);
